@@ -27,10 +27,10 @@ def scaled_dot_attention(query : jnp.ndarray,
 
     Args :
 
-        query : b x ... x seq_len x num_heads x d_k_per_head
-        key   : b x ... x seq_len x num_heads x d_k_per_head
-        value : b x ... x seq_len x num_heads x d_k_per_head
-        mask  : b x ... x seq_len x num_heads x d_k_per_head
+        query : b x ... x num_heads x seq_len x d_k_per_head
+        key   : b x ... x num_heads x seq_len x d_k_per_head
+        value : b x ... x num_heads x seq_len x d_k_per_head
+        mask  : b x ... x num_heads x seq_len x d_k_per_head
 
     """
 
@@ -38,8 +38,8 @@ def scaled_dot_attention(query : jnp.ndarray,
 
     assert key.ndim == query.ndim == value.ndim, 'query, key and value must have same rank'
     assert query.shape[:-3] == key.shape[:-3] == value.shape[:-3], 'query, key and value batch dimensions must match'
-    assert query.shape[-2] == key.shape[-2] == value.shape[-2], 'query, key and value must have same number of heads (-2 dimension)'
-    assert query.shape[-3] == key.shape[-3] == value.shape[-3], 'query, key and value must have the same sequence length dimension (-3 dimension)'
+    assert query.shape[-3] == key.shape[-3] == value.shape[-3], 'query, key and value must have same number of heads (-2 dimension)'
+    assert query.shape[-2] == key.shape[-2] == value.shape[-2], 'query, key and value must have the same sequence length dimension (-3 dimension)'
     assert query.shape[-1] == key.shape[-1] == value.shape[-1], 'query, key and value must have the same token dimension d_k (-1 dimension)'
 
     # make sure that q, k and v are can be broadcasted to the smallest common dtype
