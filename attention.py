@@ -9,9 +9,8 @@ import flax.linen as nn
 from flax.linen.dtypes import promote_dtype
 
 from typing import Optional, Any
-
-
 Dtype = Any
+
 
 def scaled_dot_attention(query : jnp.ndarray,
                          key : jnp.ndarray,
@@ -57,6 +56,51 @@ def scaled_dot_attention(query : jnp.ndarray,
     values = jnp.matmul(attention, value) # b x seq_len x num_heads x d_k
 
     return values
+
+
+
+
+class MultiheadAttention(nn.Module):
+
+    embed_dim : int
+    num_heads : int
+
+    """
+
+    Below setup() method is used. It allows pytorch style forward pass.
+    It's alternative nn.compact is analogous to keras.
+
+    setup() allows more than one forward pass method
+    (https://flax.readthedocs.io/en/latest/guides/setup_or_nncompact.html)
+
+    """
+
+    def setup(self):
+
+        self.qkv_proj = nn.Dense(3 * self.embed_dim,
+                                 kernel_init = nn.initializers.xavier_uniform(),
+                                 bias_init = nn.initializers.zeros)
+
+        self.out_proj = nn.Dense(self.embed_dim,
+                                 kernel_init = nn.initializers.xavier_uniform(),
+                                 bias_init = nn.initializers.zeros)
+
+    def __call__(self, x, mask = None):
+
+        assert embed_dim % num_heads == 0, "embed_dim modulo 0 should be num_heads"
+        batch_size, seq_len, embed_dim = x.shape
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
