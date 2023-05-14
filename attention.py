@@ -87,17 +87,65 @@ class MultiheadAttention(nn.Module):
 
     def __call__(self, x, mask = None):
 
-        assert embed_dim % num_heads == 0, "embed_dim modulo 0 should be num_heads"
         batch_size, seq_len, embed_dim = x.shape
+        assert embed_dim % self.num_heads == 0, "embed_dim modulo 0 should be num_heads"
+
+        qkv = self.qkv_proj(x)
+        qkv = qkv.reshape(batch_size, seq_len, self.num_heads, -1)
+        qkv = qkv.transpose(0, 2, 1, 3)
+        query, key, value = jnp.array_split(qkv, 3, axis = -1)
+
+        values = scaled_dot_attention(query, key, value, mask = mask)
+        values = values.transpose(0, 2, 1, 3)
+        values = values.reshape(batch_size, seq_len, embed_dim)
+        out = self.out_proj(values)
 
 
+        return out
 
 
+# a single encoder block for transformer
+
+class EncoderBlock(nn.Module):
+
+    input_dim : int # it is equal to output dim
+    num_heads : int
+    dim_feedforward : int
+    dropout_prob : float
 
 
+    def setup(self):
+
+        self.mh_att = MultiheadAttention(embed_dim = self.input_dim,
+                                         num_heads = self.num_heads)
+
+        self.linear_layers = [nn.Dense(self.dim_feedforward),
+                              nn.Dropout(self.dropout_prob),
+                              nn.relu,
+                              nn.Dense(self.input_dim)]
+
+        self.layer_norm1 = nn.LayerNorm()
+        self.layer_norm2 = nn.LayerNorm()
+        self.dropout = nn.Dropout(self.dropout_prob)
 
 
+    def __call__(self, x, mask = None, train = True):
 
+        attn_out = self.mh_att(x, mask = None)
+        x =  x + self.dropout(attn_out, deterministic = not train)
+        x = self.layer_norm1(x)
+
+        # mlp aprt
+        linear_out = x # x is needed for residual connection later for residual connection
+        for l in self.linear_layers:
+            if isinstance(l, nn.Dropout):
+                linear_out = l(linear_out, deterministic = not train)
+            else :
+                linear_out = l(linear_out)
+        x = x + self.dropout(linear_out, deterministic = not train)
+        x = self.layer_norm2(x)
+
+        return x
 
 
 
