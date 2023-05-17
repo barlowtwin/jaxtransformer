@@ -10,12 +10,13 @@ from flax.linen.dtypes import promote_dtype
 
 from typing import Optional, Any
 Dtype = Any
+Array = Any
 
 
 def scaled_dot_attention(query : jnp.ndarray,
                          key : jnp.ndarray,
                          value : jnp.ndarray,
-                         mask : Optional[jnp.ndarray] = None,
+                         mask : Optional[Array] = None,
                          dtype : Optional[Dtype] = None
                        ):
 
@@ -55,7 +56,7 @@ def scaled_dot_attention(query : jnp.ndarray,
     attention = nn.softmax(attn_logits, axis = -1) # weights for the values
     values = jnp.matmul(attention, value) # b x seq_len x num_heads x d_k
 
-    return values
+    return values, attention
 
 
 
@@ -95,13 +96,13 @@ class MultiheadAttention(nn.Module):
         qkv = qkv.transpose(0, 2, 1, 3)
         query, key, value = jnp.array_split(qkv, 3, axis = -1)
 
-        values = scaled_dot_attention(query, key, value, mask = mask)
+        values, attention = scaled_dot_attention(query, key, value, mask = mask)
         values = values.transpose(0, 2, 1, 3)
         values = values.reshape(batch_size, seq_len, embed_dim)
         out = self.out_proj(values)
 
 
-        return out
+        return out, attention
 
 
 # a single encoder block for transformer
@@ -131,8 +132,8 @@ class EncoderBlock(nn.Module):
 
     def __call__(self, x, mask = None, train = True):
 
-        attn_out = self.mh_att(x, mask = None)
-        x =  x + self.dropout(attn_out, deterministic = not train)
+        out, _ = self.mh_att(x, mask = None) # second value returned is attention
+        x =  x + self.dropout(out, deterministic = not train)
         x = self.layer_norm1(x)
 
         # mlp aprt
@@ -146,6 +147,41 @@ class EncoderBlock(nn.Module):
         x = self.layer_norm2(x)
 
         return x
+
+
+class TransformerEncoder(nn.Module):
+
+    num_layers : int
+    input_dim : int
+    num_heads : int
+    dim_feedforward : int
+    dropout_prob : int
+
+
+    def setup(self):
+        self.layers = [EncoderBlock(self.input_dim, self.num_heads, self.dim_feedforward,
+                                    self.dropout_prob) for _ in range(self.num_layers)]
+
+
+    def __call__(self, x, mask = None, train = True):
+
+        for l in self.layers:
+            x = l(x, mask = mask, train = train)
+        return x
+
+
+    def get_attention_maps(self, x, mask = None, train = True):
+
+        attention_maps = []
+        for l in self.layers:
+            _, attn_map = l.mh_att(x, mask = mask)
+            attention_maps.append(attn_map)
+            x = l(x, mask = mask, train = train)
+
+        return attention_maps
+
+
+
 
 
 

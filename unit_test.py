@@ -5,6 +5,7 @@ from attention import scaled_dot_attention
 from attention import MultiheadAttention
 from jax import random
 from attention import EncoderBlock
+from attention import TransformerEncoder
 
 # testing scaled dot attention for multi head sqeuences
 
@@ -16,7 +17,7 @@ q = jnp.asarray(q)
 k = jnp.asarray(k)
 v = jnp.asarray(v)
 
-ans = scaled_dot_attention(q, k, v)
+ans, attention = scaled_dot_attention(q, k, v)
 if ans.shape == (10, 10, 5, 5):
     print("scaled dot attention test passed")
 else :
@@ -32,9 +33,9 @@ x = np.random.rand(4, 16, 128)
 x = jnp.asarray(x)
 mh_attn = MultiheadAttention(embed_dim = 128, num_heads = 4)
 params = mh_attn.init(init_rng, x)['params']
-out = mh_attn.apply({'params' : params} ,x)
+out, attention = mh_attn.apply({'params' : params} ,x)
 if out.shape == (4, 16, 128):
-    print("multi head attention passed")
+    print("head attention passed")
 else :
     print("multi head attention not passed")
 
@@ -54,4 +55,33 @@ if out.shape == (4, 16, 128):
     print("encoder block test passed")
 else :
     print("encoder block test not passed")
+
+
+
+# testing encoder
+
+main_rng, x_rng = random.split(main_rng)
+x = random.normal(x_rng, (4, 16, 128))
+
+transenc = TransformerEncoder(num_layers= 5, input_dim = 128,
+                              num_heads = 4, dim_feedforward = 256,
+                              dropout_prob = 0.15)
+
+params = transenc.init({'params' : init_rng, 'dropout' : dropout_rng}, x, train = True)['params']
+main_rng, dropout_apply_rng = random.split(main_rng)
+transenc_bind = transenc.bind({'params' : params}, rngs = {'dropout' : dropout_apply_rng})
+out = transenc_bind(x, train = True)
+attn_maps = transenc_bind.get_attention_maps(x, train = True)
+if out.shape == (4, 16, 128):
+    print("Transformer Encoder test passed")
+else :
+    print("Transformer Encoder test not passed")
+if attn_maps[0].shape == (4, 4, 16, 16):
+    print("attention maps test passed")
+else :
+    print("attention maps test not passed")
+
+
+
+
 
